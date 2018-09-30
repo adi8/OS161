@@ -1,0 +1,8 @@
+!.gitignore
+
+defs.mk
+
+**/*.o
+
+**/compile/**/*
+
