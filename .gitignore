@@ -5,4 +5,5 @@ defs.mk
 **/*.o
 
 **/compile/**/*
-
+build/**
+design/**

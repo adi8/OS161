@@ -50,6 +50,7 @@
 #include <addrspace.h>
 #include <vnode.h>
 #include <filetable.h>
+#include <pid.h>
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -84,6 +85,14 @@ proc_create(const char *name)
 	/* VFS fields */
 	proc->p_cwd = NULL;
 	proc->p_filetable = NULL;
+
+        /* Assign PID */
+        proc->pid = pid_retrieve();
+        if (proc->pid == -1) {
+                kfree(proc->p_name);
+                kfree(proc);
+                return NULL;
+        }
 
 	return proc;
 }
@@ -174,6 +183,8 @@ proc_destroy(struct proc *proc)
 
 	threadarray_cleanup(&proc->p_threads);
 	spinlock_cleanup(&proc->p_lock);
+
+        pid_reclaim(proc->pid);
 
 	kfree(proc->p_name);
 	kfree(proc);

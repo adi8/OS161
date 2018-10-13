@@ -39,6 +39,9 @@
 #include <spinlock.h>
 #include <thread.h> /* required for struct threadarray */
 
+/* Maximum number of child processes */
+#define MAX_CHILDREN 10
+
 struct addrspace;
 struct vnode;
 
@@ -57,7 +60,10 @@ struct proc {
 	struct vnode *p_cwd;		/* current working directory */
 	struct filetable *p_filetable;	/* table of open files */
 
-	/* add more material here as needed */
+        pid_t pid;                      /* unique id */
+        //TODO: is there a better way to do this
+        struct proc *
+        p_children[MAX_CHILDREN];       /* children of this process */
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */
