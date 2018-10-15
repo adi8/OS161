@@ -61,9 +61,7 @@ struct proc {
 	struct filetable *p_filetable;	/* table of open files */
 
         pid_t pid;                      /* unique id */
-        //TODO: is there a better way to do this
-        struct proc *
-        p_children[MAX_CHILDREN];       /* children of this process */
+        pid_t ppid;                     /* parent id */
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */
