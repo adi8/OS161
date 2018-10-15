@@ -1,4 +1,5 @@
 #include <types.h>
+#include <kern/errno.h>
 #include <array.h>
 #include <limits.h>
 #include <synch.h>
@@ -27,8 +28,8 @@ pid_bootstrap(void)
 /*
  * Retrieve a pid.
  */
-pid_t
-pid_retrieve(void)
+int
+pid_retrieve(pid_t *ret)
 {
         /* 
          * Check if maximum number of processes reached
@@ -53,13 +54,19 @@ pid_retrieve(void)
                 // Increment number of pid assigned in system              
                 counter++;
 
+                // Assign generated value to process.
+                *ret = pid_gen;
+
                 lock_release(pid_gen_lock);
         }
         else {
-                pid_gen = -1;
+                *ret = -1;
+                kprintf("Too many processes in the system");
+                return ENPROC;
         }
 
-        return pid_gen;
+
+        return 0;
 }
 
 /*

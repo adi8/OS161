@@ -79,6 +79,8 @@ proc_create(const char *name)
 
 	threadarray_init(&proc->p_threads);
 	spinlock_init(&proc->p_lock);
+        proclistnode_init(&proc->p_listnode, proc);
+        proclist_init(&proc->p_child);
 
 	/* VM fields */
 	proc->p_addrspace = NULL;
@@ -88,8 +90,8 @@ proc_create(const char *name)
 	proc->p_filetable = NULL;
 
         /* Assign PID */
-        proc->pid = pid_retrieve();
-        if (proc->pid == -1) {
+        int err = pid_retrieve(&proc->pid);
+        if (err) {
                 kfree(proc->p_name);
                 kfree(proc);
                 return NULL;
@@ -184,6 +186,8 @@ proc_destroy(struct proc *proc)
 
 	threadarray_cleanup(&proc->p_threads);
 	spinlock_cleanup(&proc->p_lock);
+        proclistnode_cleanup(&proc->p_listnode);
+        proclist_cleanup(&proc->p_child);
 
         pid_reclaim(proc->pid);
 

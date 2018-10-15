@@ -47,48 +47,59 @@ enter_forked_process(struct trapframe *tf)
 int
 sys_fork(struct trapframe *proc_tf, int *retval)
 {
-        /* Copy trap frame of current process */
-        struct trapframe *child_tf = kmalloc(sizeof(*proc_tf));
-        if (child_tf == NULL) {
-                return ENOMEM;
-        }
-        memcpy(child_tf, proc_tf, sizeof(*proc_tf));
+        /* Ref to current process */
+        struct proc *proc = curproc;
+        
+        if (proc->pl_count <= MAX_CHILDREN) {
+                /* Copy trap frame of current process */
+                struct trapframe *child_tf = kmalloc(sizeof(*proc_tf));
+                if (child_tf == NULL) {
+                        return ENOMEM;
+                }
+                memcpy(child_tf, proc_tf, sizeof(*proc_tf));
 
-        /* Copy proc structure of current process */
-        struct proc **child_proc = kmalloc(sizeof(struct proc*));
-        int err = proc_fork(child_proc);
-        if (err) {
-                kfree(child_tf);
-                return err; 
-        }
-        
-        /* Copy addrspace of current process */
-        struct addrspace *proc_addrspace = proc_getas();
-        struct addrspace **child_addrspace = 
-                kmalloc(sizeof(struct addrspace*)); 
-        err = as_copy(proc_addrspace, child_addrspace);
-        if (err) {
-                kfree(child_proc);
-                kfree(child_tf);
-                return err;
-        }
-        (*child_proc)->p_addrspace = *child_addrspace;
+                /* Copy proc structure of current process */
+                struct proc **child_proc = kmalloc(sizeof(struct proc*));
+                int err = proc_fork(child_proc);
+                if (err) {
+                        kfree(child_tf);
+                        return err; 
+                }
 
-        /* Copy current thread */
-        err = thread_fork("child", *child_proc,
-                          enter_forked_process,
-                          child_tf, 0);
-        if (err) {
-                kfree(child_addrspace);
-                kfree(child_proc);
-                kfree(child_tf);
-                return err;
+                /* Adding the child proc in parent childrens list */
+                proclist_addhead(&proc->p_child, *child_proc);        
+                
+                /* Copy addrspace of current process */
+                struct addrspace *proc_addrspace = proc_getas();
+                struct addrspace **child_addrspace = 
+                        kmalloc(sizeof(struct addrspace*)); 
+                err = as_copy(proc_addrspace, child_addrspace);
+                if (err) {
+                        kfree(child_proc);
+                        kfree(child_tf);
+                        return err;
+                }
+                (*child_proc)->p_addrspace = *child_addrspace;
+
+                /* Copy current thread */
+                err = thread_fork("child", *child_proc,
+                                  enter_forked_process,
+                                  child_tf, 0);
+                if (err) {
+                        kfree(child_addrspace);
+                        kfree(child_proc);
+                        kfree(child_tf);
+                        return err;
+                }
+                
+
+                /* Return value of current process */
+                *retval = (*child_proc)->pid;
         }
-        
-        // TODO: Adding the child proc in parent childrens list
-        
-        /* Return value of current process */
-        *retval = (*child_proc)->pid;
+        else {
+                kprintf("Too many processes\n");
+                return EMPROC;
+        }
         
         return 0;
 }

@@ -19,7 +19,7 @@ bool pid_arr[PID_MAX];     /* List of pids assigned */
 void pid_bootstrap(void);
 
 /* Call to retrieve next pid to assign */
-pid_t pid_retrieve(void);
+int pid_retrieve(pid_t *ret);
 
 /* Call to reclaim pid */
 int pid_reclaim(pid_t pid);

@@ -38,6 +38,7 @@
 
 #include <spinlock.h>
 #include <thread.h> /* required for struct threadarray */
+#include <proclist.h>
 
 /* Maximum number of child processes */
 #define MAX_CHILDREN 10
@@ -49,19 +50,22 @@ struct vnode;
  * Process structure.
  */
 struct proc {
-	char *p_name;			/* Name of this process */
-	struct spinlock p_lock;		/* Lock for this structure */
-	struct threadarray p_threads;	/* Threads in this process */
+	char *p_name;			 /* Name of this process */
+	struct spinlock p_lock;		 /* Lock for this structure */
+	struct threadarray p_threads;	 /* Threads in this process */
 
 	/* VM */
-	struct addrspace *p_addrspace;	/* virtual address space */
+	struct addrspace *p_addrspace;	 /* virtual address space */
 
 	/* VFS */
-	struct vnode *p_cwd;		/* current working directory */
-	struct filetable *p_filetable;	/* table of open files */
+	struct vnode *p_cwd;		 /* current working directory */
+	struct filetable *p_filetable;	 /* table of open files */
 
-        pid_t pid;                      /* unique id */
-        pid_t ppid;                     /* parent id */
+        pid_t pid;                       /* unique id */
+        pid_t ppid;                      /* parent id */
+        struct proclistnode p_listnode; /* process as a list node */
+        struct proclist p_child;        /* children list */
+        int pl_count;                    /* children count */
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */
