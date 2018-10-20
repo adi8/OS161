@@ -20,7 +20,7 @@ pid_bootstrap(void)
         }
 
         for (int i=0; i<PID_MAX-2; i++) {
-                pid_arr[i] = 0;
+                pid_arr[i] = false;
         }
 
 }
@@ -49,19 +49,18 @@ pid_retrieve(pid_t *ret)
                 } while (pid_arr[pid_gen]);
                 
                 // Set generated pid to mark as assigned
-                pid_arr[pid_gen] = 1;
+                pid_arr[pid_gen] = true;
 
-                // Increment number of pid assigned in system              
+                // Increment number of pid assigned in system 
                 counter++;
 
-                // Assign generated value to process.
+                // Assign generated value to process
                 *ret = pid_gen;
 
                 lock_release(pid_gen_lock);
         }
         else {
                 *ret = -1;
-                kprintf("Too many processes in the system");
                 return ENPROC;
         }
 
@@ -83,7 +82,7 @@ pid_reclaim(pid_t pid)
          */
 
         // Unset pid to mark as unassigned
-        pid_arr[pid] = 0; 
+        pid_arr[pid] = false; 
 
         // Decrement number of pid assigned in system
         counter--; 

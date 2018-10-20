@@ -55,7 +55,7 @@ filetable_create(void)
 	/* the table starts empty */
 	for (fd = 0; fd < OPEN_MAX; fd++) {
 		ft->ft_openfiles[fd] = NULL;
-	}
+        }
 
 	return ft;
 }
@@ -160,9 +160,6 @@ filetable_get(struct filetable *ft, int fd, struct openfile **ret)
 		return EBADF;
 	}
 
-        /* Acquire a lock on file for synchronization */
-        lock_acquire(file->of_offsetlock);
-
 	*ret = file;
 	return 0;
 }
@@ -188,8 +185,6 @@ void
 filetable_put(struct filetable *ft, int fd, struct openfile *file)
 {
 	KASSERT(ft->ft_openfiles[fd] == file);
-        /* Release lock acquired in filetable_get */
-        lock_release(file->of_offsetlock);
 }
 
 /*

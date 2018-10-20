@@ -75,4 +75,6 @@ int sys___getcwd(userptr_t buf, size_t buflen, int *retval);
 int sys_getpid(int *retval);
 int sys_fork(struct trapframe *proc_tf, int *retval);
 
+__DEAD void sys__exit(int exit_code);
+
 #endif /* _SYSCALL_H_ */

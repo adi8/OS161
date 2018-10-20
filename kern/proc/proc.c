@@ -71,11 +71,35 @@ proc_create(const char *name)
 		return NULL;
 	}
 
+        /* Assign PID */
+        int err = pid_retrieve(&proc->pid);
+        if (err) {
+                kfree(proc);
+                return NULL;
+        }
+
 	proc->p_name = kstrdup(name);
 	if (proc->p_name == NULL) {
-		kfree(proc);
+                proc_destroy(proc);
 		return NULL;
 	}
+
+        proc->p_wait_cv = cv_create("proc_cv");
+        if (proc->p_wait_cv == NULL) {
+                proc_destroy(proc);
+                return NULL;
+        }
+
+        proc->p_wait_lock = lock_create("proc_wait_lock");
+        if (proc->p_wait_lock == NULL) {
+                proc_destroy(proc);
+                return NULL;
+        }
+
+        proc->ppid = -1;
+        proc->wait_count = 0;
+        proc->exit_code = -1;
+        proc->exit_status = false;
 
 	threadarray_init(&proc->p_threads);
 	spinlock_init(&proc->p_lock);
@@ -88,14 +112,6 @@ proc_create(const char *name)
 	/* VFS fields */
 	proc->p_cwd = NULL;
 	proc->p_filetable = NULL;
-
-        /* Assign PID */
-        int err = pid_retrieve(&proc->pid);
-        if (err) {
-                kfree(proc->p_name);
-                kfree(proc);
-                return NULL;
-        }
 
 	return proc;
 }
@@ -186,8 +202,11 @@ proc_destroy(struct proc *proc)
 
 	threadarray_cleanup(&proc->p_threads);
 	spinlock_cleanup(&proc->p_lock);
+        
         proclistnode_cleanup(&proc->p_listnode);
         proclist_cleanup(&proc->p_child);
+        cv_destroy(proc->p_wait_cv);
+        lock_destroy(proc->p_wait_lock);
 
         pid_reclaim(proc->pid);
 

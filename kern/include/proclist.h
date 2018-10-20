@@ -37,7 +37,7 @@ void proclist_insertafter(struct proclist *pl,
 			    struct proc *onlist, struct proc *addee);
 void proclist_insertbefore(struct proclist *pl,
 			     struct proc *addee, struct proc *onlist);
-void proclist_remove(struct proclist *pl, struct proc *t);
+void proclist_remove(struct proclist *pl, struct proc *p);
 
 /* Iteration; itervar should previously be declared as (struct proc *) */
 #define PROCLIST_FORALL(itervar, pl) \

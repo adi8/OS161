@@ -202,10 +202,13 @@ syscall(struct trapframe *tf)
 
             case SYS_fork:
                 err = sys_fork(tf, &retval);
+                if (err) {
+                        sys__exit(err);
+                }
                 break;
 
             case SYS__exit:
-                err = 1;
+                sys__exit(tf->tf_a0);
                 break;
 
 	    default:

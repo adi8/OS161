@@ -41,6 +41,7 @@
 #include <sfs.h>
 #include <syscall.h>
 #include <test.h>
+#include <synch.h>
 #include "opt-synchprobs.h"
 #include "opt-sfs.h"
 #include "opt-net.h"

@@ -37,6 +37,7 @@
  */
 
 #include <spinlock.h>
+#include <synch.h>
 #include <thread.h> /* required for struct threadarray */
 #include <proclist.h>
 
@@ -61,11 +62,20 @@ struct proc {
 	struct vnode *p_cwd;		 /* current working directory */
 	struct filetable *p_filetable;	 /* table of open files */
 
-        pid_t pid;                       /* unique id */
-        pid_t ppid;                      /* parent id */
-        struct proclistnode p_listnode; /* process as a list node */
-        struct proclist p_child;        /* children list */
-        int pl_count;                    /* children count */
+        /* Process information */
+        pid_t pid;                       /* unique id for this process */
+        pid_t ppid;                      /* pid of parent for this process */
+
+        /* Child management */
+        struct proclistnode p_listnode;  /* process as a proclist node */
+        struct proclist p_child;         /* children list */
+        struct cv *p_wait_cv;            /* wait on this proc */
+        struct lock *p_wait_lock;        /* lock for wait cv */
+        int wait_count;                  /* no of proc waiting */
+        
+        /* Exit status */
+        int exit_code;                   /* exit code */
+        bool exit_status;                /* exit status */
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */

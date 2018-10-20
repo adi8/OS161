@@ -50,7 +50,7 @@
 #include <addrspace.h>
 #include <mainbus.h>
 #include <vnode.h>
-
+#include <syscall.h>
 #include "opt-synchprobs.h"
 
 
@@ -712,7 +712,6 @@ thread_switch(threadstate_t newstate, struct wchan *wc, struct spinlock *lk)
 	 * thread_startup.
 	 */
 
-
 	/* Clear the wait channel and set the thread state. */
 	cur->t_wchan_name = NULL;
 	cur->t_state = S_RUN;
@@ -777,7 +776,7 @@ thread_startup(void (*entrypoint)(void *data1, unsigned long data2),
 	entrypoint(data1, data2);
 
 	/* Done. */
-	thread_exit();
+        sys__exit(0);
 }
 
 /*
@@ -800,7 +799,6 @@ thread_exit(void)
 	 * Detach from our process. You might need to move this action
 	 * around, depending on how your wait/exit works.
 	 */
-	proc_remthread(cur);
 
 	/* Make sure we *are* detached (move this only if you're sure!) */
 	KASSERT(cur->t_proc == NULL);
