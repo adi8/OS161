@@ -45,8 +45,10 @@
 #include <vfs.h>
 #include <openfile.h>
 #include <filetable.h>
+#include <copyinout.h>
 #include <syscall.h>
 #include <test.h>
+#include <execv.h>
 
 /*
  * Open a file on a selected file descriptor. Takes care of various
@@ -119,12 +121,19 @@ open_stdfds(const char *inpath, const char *outpath, const char *errpath)
  * Calls vfs_open on progname and thus may destroy it.
  */
 int
-runprogram(char *progname)
+runprogram(char *progname, char **args, int argc)
 {
 	struct addrspace *as;
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
 	int result;
+
+        // Allocate memory for the array of char pointers
+        char **args_copy = kmalloc((argc + 1) * sizeof(char *));
+        result = copy_args(args_copy, args, argc);
+        if (result) {
+                return result;
+        }
 
 	/* Open the file. */
 	result = vfs_open(progname, O_RDONLY, 0, &v);
@@ -179,8 +188,18 @@ runprogram(char *progname)
 		return result;
 	}
 
+        /* Load user arguments into programs address space */
+        userptr_t sp = (userptr_t) stackptr;
+        result = load_args(&sp, args_copy, argc);
+        if (result) {
+                return result;
+        }
+
+        userptr_t argv = sp;
+        stackptr = (vaddr_t) sp;
+        
 	/* Warp to user mode. */
-	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
+	enter_new_process(argc /*argc*/, argv /*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
 			  stackptr, entrypoint);
 
