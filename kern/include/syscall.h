@@ -76,5 +76,6 @@ int sys_getpid(int *retval);
 int sys_fork(struct trapframe *proc_tf, int *retval);
 
 __DEAD void sys__exit(int exit_code);
+int sys_execv(const char *program, char **args);
 
 #endif /* _SYSCALL_H_ */
