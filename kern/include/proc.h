@@ -42,7 +42,7 @@
 #include <proclist.h>
 
 /* Maximum number of child processes */
-#define MAX_CHILDREN 10
+#define MAX_CHILDREN 20
 
 struct addrspace;
 struct vnode;
@@ -51,31 +51,32 @@ struct vnode;
  * Process structure.
  */
 struct proc {
-	char *p_name;			 /* Name of this process */
-	struct spinlock p_lock;		 /* Lock for this structure */
-	struct threadarray p_threads;	 /* Threads in this process */
+	char *p_name;			       /* Name of this process */
+	struct spinlock p_lock;		       /* Lock for this structure */
+	struct threadarray p_threads;	       /* Threads in this process */
 
 	/* VM */
-	struct addrspace *p_addrspace;	 /* virtual address space */
+	struct addrspace *p_addrspace;	       /* virtual address space */
 
 	/* VFS */
-	struct vnode *p_cwd;		 /* current working directory */
-	struct filetable *p_filetable;	 /* table of open files */
+	struct vnode *p_cwd;		       /* current working directory */
+	struct filetable *p_filetable;	       /* table of open files */
 
         /* Process information */
-        pid_t pid;                       /* unique id for this process */
-        pid_t ppid;                      /* pid of parent for this process */
+        pid_t pid;                             /* unique id for this process */
+        pid_t ppid;                            /* pid of parent for this process */
 
         /* Child management */
-        struct proclistnode p_listnode;  /* process as a proclist node */
-        struct proclist p_child;         /* children list */
-        struct cv *p_wait_cv;            /* wait on this proc */
-        struct lock *p_wait_lock;        /* lock for wait cv */
-        int wait_count;                  /* no of proc waiting */
+        struct proclistnode p_listnode;        /* process as a proclist node */
+        struct proclist p_child;               /* children list */
+        struct cv *p_wait_cv;                  /* wait on this proc */
+        struct lock *p_wait_lock;              /* lock for wait cv */
+        int wait_count;                        /* no of proc waiting */
+        struct proc *p_wait_arr[MAX_CHILDREN]; /* ptrs to processes waiting */
         
         /* Exit status */
-        int exit_code;                   /* exit code */
-        bool exit_status;                /* exit status */
+        int exit_code;                         /* exit code */
+        bool exit_status;                      /* exit status */
 };
 
 /* This is the process structure for the kernel and for kernel-only threads. */

@@ -6,6 +6,7 @@
 #include <mips/trapframe.h>
 #include <addrspace.h>
 #include <current.h>
+#include <copyinout.h>
 #include <thread.h>
 #include <proc.h>
 #include <proclist.h>
@@ -75,7 +76,9 @@ sys_fork(struct trapframe *proc_tf, int *retval)
                 }
 
                 /* Adding the child proc in parent childrens list */
+                spinlock_acquire(&proc->p_lock);
                 proclist_addhead(&proc->p_child, *child_proc);        
+                spinlock_release(&proc->p_lock);
                 
                 /* Assign a ppid to child proc */
                 (*child_proc)->ppid = proc->pid;
@@ -85,6 +88,10 @@ sys_fork(struct trapframe *proc_tf, int *retval)
                 struct addrspace **child_addrspace = 
                         kmalloc(sizeof(struct addrspace*)); 
                 if (child_addrspace == NULL) {
+                        spinlock_acquire(&proc->p_lock);
+                        proclist_remove(&proc->p_child, *child_proc);
+                        spinlock_release(&proc->p_lock);
+
                         proc_destroy(*child_proc);
                         kfree(child_proc);
                         kfree(child_tf);
@@ -92,6 +99,10 @@ sys_fork(struct trapframe *proc_tf, int *retval)
                 }
                 err = as_copy(proc_addrspace, child_addrspace);
                 if (err) {
+                        spinlock_acquire(&proc->p_lock);
+                        proclist_remove(&proc->p_child, *child_proc);
+                        spinlock_release(&proc->p_lock);
+
                         proc_destroy(*child_proc);
                         kfree(child_proc);
                         kfree(child_tf);
@@ -104,6 +115,10 @@ sys_fork(struct trapframe *proc_tf, int *retval)
                                   enter_forked_process,
                                   child_tf, 0);
                 if (err) {
+                        spinlock_acquire(&proc->p_lock);
+                        proclist_remove(&proc->p_child, *child_proc);
+                        spinlock_release(&proc->p_lock);
+
                         kfree(child_addrspace);
                         proc_destroy(*child_proc);
                         kfree(child_proc);
@@ -119,6 +134,63 @@ sys_fork(struct trapframe *proc_tf, int *retval)
                 kprintf("Too many processes\n");
                 return EMPROC;
         }
+        
+        return 0;
+}
+
+/*
+ * Wait for the given pid and return the status of the
+ * process we are waiting for.
+ */
+int
+sys_waitpid(pid_t pid, userptr_t status, int options, pid_t *retval)
+{
+        struct proc *proc = curproc;
+
+        // Check if valid option passed
+        // Right now we only support a single option
+        if (options != 0) {
+                return EINVAL; 
+        }
+
+        // Check if status pointer is valid
+        if (status == NULL) {
+                return EFAULT;
+        }
+
+        // Check if pid among child processes 
+        // A process can wait only on child processses
+        spinlock_acquire(&proc->p_lock);
+        bool found = false;
+        struct proc *child = NULL;
+        PROCLIST_FORALL(child, proc->p_child) {
+                if (child->pid == pid) {
+                        found = true;
+                        break;
+                }
+        }        
+        spinlock_release(&proc->p_lock);
+
+        if (!found) {
+                return ESRCH;
+        }
+
+        // Wait if child not exited.
+        if (!child->exit_status) {
+                lock_acquire(child->p_wait_lock);
+                (child->wait_count)++;
+                
+                cv_wait(child->p_wait_cv, child->p_wait_lock);
+        }
+        
+        // Extract the exit code of the process
+        int err = copyout((const void *)&child->exit_code, status, sizeof(int));
+        if (err) {
+                return err;
+        }
+        
+        // Return the pid of child proc
+        *retval = child->pid;
         
         return 0;
 }

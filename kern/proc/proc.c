@@ -106,6 +106,11 @@ proc_create(const char *name)
         proclistnode_init(&proc->p_listnode, proc);
         proclist_init(&proc->p_child);
 
+        /* Initialize process wait array */
+        for (int i = 0; i < MAX_CHILDREN; i++) {
+                proc->p_wait_arr[i] = NULL;
+        }
+
 	/* VM fields */
 	proc->p_addrspace = NULL;
 

@@ -35,6 +35,7 @@
 #include <lib.h>
 #include <uio.h>
 #include <clock.h>
+#include <current.h>
 #include <thread.h>
 #include <proc.h>
 #include <vfs.h>
@@ -129,15 +130,27 @@ common_prog(int nargs, char **args)
 		return ENOMEM;
 	}
 
+        struct proc *cproc = curproc;
+        spinlock_acquire(&cproc->p_lock);
+        proclist_addhead(&cproc->p_child, proc);
+        spinlock_release(&cproc->p_lock);
+
 	result = thread_fork(args[0] /* thread name */,
 			proc /* new process */,
 			cmd_progthread /* thread function */,
 			args /* thread arg */, nargs /* thread arg */);
 	if (result) {
 		kprintf("thread_fork failed: %s\n", strerror(result));
+                spinlock_acquire(&cproc->p_lock);
+                proclist_remove(&cproc->p_child, proc);
+                spinlock_release(&cproc->p_lock);
 		proc_destroy(proc);
 		return result;
 	}
+
+        pid_t retval;
+        int status;
+        sys_waitpid(proc->pid, (userptr_t) &status, 0, &retval);
 
 	/*
 	 * The new process will be destroyed when the program exits...

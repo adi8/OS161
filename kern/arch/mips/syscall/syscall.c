@@ -212,7 +212,14 @@ syscall(struct trapframe *tf)
                 break;
 
             case SYS_execv:
-                err = sys_execv(tf->tf_a0, tf->tf_a1);
+                err = sys_execv((const char *)tf->tf_a0, (char **)tf->tf_a1);
+                break;
+
+            case SYS_waitpid:
+                err = sys_waitpid(tf->tf_a0, /* pid to wait for */
+                                (userptr_t)tf->tf_a1, /* status ptr to return */
+                                tf->tf_a2, /* option (always 0) */
+                                &retval); /* return pid value */
                 break;
                 
 	    default:
