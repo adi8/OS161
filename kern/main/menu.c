@@ -129,6 +129,9 @@ common_prog(int nargs, char **args)
         spinlock_acquire(&cproc->p_lock);
         proclist_addhead(&cproc->p_child, proc);
         spinlock_release(&cproc->p_lock);
+        
+        /* Assign a ppid to child proc */
+        //proc->ppid = cproc->pid;
 
 	result = thread_fork(args[0] /* thread name */,
 			proc /* new process */,
@@ -143,9 +146,13 @@ common_prog(int nargs, char **args)
 		return result;
 	}
 
-        pid_t retval;
-        int status;
-        sys_waitpid(proc->pid, (userptr_t) &status, 0, &retval);
+        sys_waitpid(proc->pid, NULL, 0, NULL);
+
+        // Remove proc from child list
+        spinlock_acquire(&cproc->p_lock);
+        proclist_remove(&cproc->p_child, proc);
+        spinlock_release(&cproc->p_lock);
+        proc_destroy(proc);
 
 	/*
 	 * The new process will be destroyed when the program exits...
@@ -170,6 +177,9 @@ cmd_prog(int nargs, char **args)
 	/* drop the leading "p" */
 	args++;
 	nargs--;
+        
+        /* Mark the last paramenter as NULL*/
+        args[nargs] = NULL;
 
 	return common_prog(nargs, args);
 }

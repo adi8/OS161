@@ -129,12 +129,14 @@ runprogram(char *progname, char **args, int argc)
 	int result;
 
         // Allocate memory for the array of char pointers
+        // For some reason strings pointed to by args vanish
+        // after load_elf is executed. Hence, this copying
         char **args_copy = kmalloc((argc + 1) * sizeof(char *));
-        result = copy_args(args_copy, args, argc);
+        result = kcopy_args(args_copy, args, argc);
         if (result) {
                 return result;
         }
-
+        
 	/* Open the file. */
 	result = vfs_open(progname, O_RDONLY, 0, &v);
 	if (result) {

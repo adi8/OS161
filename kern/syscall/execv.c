@@ -12,13 +12,45 @@
 #include <execv.h>
 
 /*
+ * Copy arguments array within kernel.
+ */
+int
+kcopy_args(char **dest, char **src, int len)
+{
+        int i;
+        size_t sz;
+        char *ret;
+
+        for (i = 0; i < len; i++) {
+                // Extract size of the string to store in dest
+                sz = strlen(*(src + i)) + 1;
+                
+                // Allocate memory for the actual argument string
+                // in dest
+                *(dest + i) = kmalloc(sz);
+                if (*(dest + i) == NULL) {
+                        return ENOMEM;
+                }
+        
+                ret = strcpy(*(dest + i), *(src + i));
+                if (ret == NULL) {
+                        return ENOMEM;
+                }
+        }
+
+        *(dest + i) = NULL;
+
+        return 0;
+}
+
+/*
  * Copy arguments array from userspace to kernel space.
  *
  */
 int
 copy_args(char **dest, char **src, int len)
 {
-        int i;
+        int i, result;
         size_t sz;
         for (i = 0; i < len; i++) {
                 // Extract size of the string to store in dest
@@ -27,10 +59,14 @@ copy_args(char **dest, char **src, int len)
                 // Allocate memory for the actual argument string
                 // in dest
                 *(dest + i) = kmalloc(sz);
-        
-                char *ret = strcpy(*(dest + i), *(src + i));
-                if (ret == NULL) {
+                if (*(dest + i) == NULL) {
                         return ENOMEM;
+                }
+        
+                //char *ret = strcpy(*(dest + i), *(src + i));
+                result = copyinstr((const_userptr_t)*(src + i), *(dest + i), sz, NULL);
+                if (result) {
+                        return result;
                 }
         }
 
@@ -66,8 +102,7 @@ load_args(userptr_t *sp, char **src, int len)
 
                 // Copy string into user stack
                 bzero(*sp, sz);
-                size_t actual;
-                int res = copyoutstr((const char *)*(src + i), *sp, sz, &actual);
+                int res = copyoutstr((const char *)*(src + i), *sp, sz, NULL);
                 if (res) {
                         return res;
                 }
@@ -105,8 +140,26 @@ load_args(userptr_t *sp, char **src, int len)
 int
 count_args(char **args, int *ret)
 {
+        // Check if valid args pointer passed
+        char **kargs = kmalloc(sizeof(char **));
+        int result = copyin((const_userptr_t)args, (void *)kargs,
+                            sizeof(char **)); 
+        if (result) {
+                return result;
+        }
+
+        // Check the number of args passed
         int i = 0;
-        for (i = 0; *(args+i) != NULL && i < MAXEXECVARGS; i++);
+        for (i = 0; *(args+i) != NULL && i < MAXEXECVARGS; i++) {
+                // Check if pointers in args are valid
+                char *ptr = *(args + i);
+                char *kptr = kmalloc(sizeof(char *));
+                result = copyin((const_userptr_t)ptr, (void *)kptr,
+                                sizeof(char));
+                if (result) {
+                        return result;
+                }
+        }
         if (i == MAXEXECVARGS) {
                 return E2BIG;
         }
@@ -121,6 +174,25 @@ int
 sys_execv(const char *program, char **args)
 {
         int result;
+
+        /* Check if program name and args passed */
+        if (program == NULL || args == NULL) {
+                return EFAULT;
+        }
+
+        /* Check if pointer given is valid */
+        size_t actual;
+        char progname[128];
+        result = copyinstr((const_userptr_t)program, progname,
+                           128, &actual);
+        if (result) {
+                return result;
+        }
+
+        // If only '\0' copied return
+        if (actual == 1) {
+                return EINVAL;
+        }
 
         /* Count number of args */
         int argc;
@@ -138,8 +210,6 @@ sys_execv(const char *program, char **args)
 
         /* Open new program file */
         struct vnode *v;
-        char *progname;
-        progname = kstrdup(program);
         result = vfs_open(progname, O_RDONLY, 0, &v);
         if (result) {
                 return result;

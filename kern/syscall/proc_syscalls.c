@@ -153,11 +153,6 @@ sys_waitpid(pid_t pid, userptr_t status, int options, pid_t *retval)
                 return EINVAL; 
         }
 
-        // Check if status pointer is valid
-        if (status == NULL) {
-                return EFAULT;
-        }
-
         // Check if pid among child processes 
         // A process can wait only on child processses
         spinlock_acquire(&proc->p_lock);
@@ -181,16 +176,25 @@ sys_waitpid(pid_t pid, userptr_t status, int options, pid_t *retval)
                 (child->wait_count)++;
                 
                 cv_wait(child->p_wait_cv, child->p_wait_lock);
+
+                (child->wait_count)--;
+                lock_release(child->p_wait_lock);
         }
         
         // Extract the exit code of the process
-        int err = copyout((const void *)&child->exit_code, status, sizeof(int));
-        if (err) {
-                return err;
+        if (status != NULL) {
+
+                int err = copyout((const void *)&child->exit_code, 
+                                  status, sizeof(int));
+                if (err) {
+                        return err;
+                }
         }
         
         // Return the pid of child proc
-        *retval = child->pid;
+        if (retval != NULL) {
+                *retval = child->pid;
+        }
         
         return 0;
 }
