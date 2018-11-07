@@ -5,7 +5,7 @@
 TOP=../..
 .include "$(TOP)/mk/os161.config.mk"
 
-SUBDIRS=myfork getpidtest myargs myexecv
+SUBDIRS=myfork getpidtest myargs myexecv mybadexecv
 
 # But not:
 #    userthreads    (no support in kernel API in base system)
