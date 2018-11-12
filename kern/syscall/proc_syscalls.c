@@ -1,5 +1,6 @@
 #include <types.h>
 #include <kern/errno.h>
+#include <kern/wait.h>
 #include <limits.h>
 #include <cdefs.h>
 #include <lib.h>
@@ -212,8 +213,9 @@ sys__exit(int exit_code)
         struct proc *proc   = curt->t_proc;
 
         // Set exit code and status for this process
-        proc->exit_code   = exit_code;
+        proc->exit_code   = _MKWAIT_EXIT(exit_code);
         proc->exit_status = true;
+
         
         // Remove current thread from process
         proc_remthread(curt);
