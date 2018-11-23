@@ -340,6 +340,7 @@ file      proc/proclist.c
 #
 
 file      vm/kmalloc.c
+file      vm/vm.c
 
 optofffile dumbvm   vm/addrspace.c
 
