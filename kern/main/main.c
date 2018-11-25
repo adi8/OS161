@@ -50,6 +50,7 @@
 #include <test.h>
 #include <version.h>
 #include <pid.h>
+#include <coremap.h>
 #include "autoconf.h"  // for pseudoconfig
 
 
@@ -108,6 +109,7 @@ boot(void)
 
 	/* Early initialization. */
 	ram_bootstrap();
+        coremap_bootstrap();
         pid_bootstrap();
 	proc_bootstrap();
 	thread_bootstrap();

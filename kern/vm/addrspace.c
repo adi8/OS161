@@ -80,6 +80,9 @@ as_create(void)
 void
 as_destroy(struct addrspace *as)
 {
+        free_kpages(PADDR_TO_KVADDR(as->as_pbase1));
+        free_kpages(PADDR_TO_KVADDR(as->as_pbase2));
+        free_kpages(PADDR_TO_KVADDR(as->as_stackpbase));
 	kfree(as);
 }
 

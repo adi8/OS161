@@ -104,6 +104,7 @@ load_args(userptr_t *sp, char **src, int len)
                 bzero(*sp, sz);
                 int res = copyoutstr((const char *)*(src + i), *sp, sz, NULL);
                 if (res) {
+                        kfree(argv_ptrs);
                         return res;
                 }
         }
@@ -128,8 +129,12 @@ load_args(userptr_t *sp, char **src, int len)
         bzero(*sp, array_sz);
         int res = copyout(argv_ptrs, *sp, array_sz);
         if (res) {
+                kfree(argv_ptrs);
                 return res;
         }
+
+        /* Done with argv_ptrs */
+        kfree(argv_ptrs);
 
         return 0;
 }
@@ -145,6 +150,7 @@ count_args(char **args, int *ret)
         int result = copyin((const_userptr_t)args, (void *)kargs,
                             sizeof(char **)); 
         if (result) {
+                kfree(kargs);
                 return result;
         }
 
@@ -157,12 +163,20 @@ count_args(char **args, int *ret)
                 result = copyin((const_userptr_t)ptr, (void *)kptr,
                                 sizeof(char));
                 if (result) {
+                        kfree(kptr);
                         return result;
                 }
+
+                /* Done with kptr */
+                kfree(kptr);
         }
         if (i == MAXEXECVARGS) {
                 return E2BIG;
         }
+        
+        /* Done with kargs */
+        kfree(kargs);
+
         *ret = i;
         return 0;
 }
@@ -256,6 +270,9 @@ sys_execv(const char *program, char **args)
         if (result) {
                 return result;
         }
+
+        /* Done with args_copy */
+        kfree(args_copy);
 
         userptr_t argv = sp;
         stackptr = (vaddr_t) sp;

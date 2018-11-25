@@ -197,9 +197,12 @@ runprogram(char *progname, char **args, int argc)
                 return result;
         }
 
+        /* Done loading args */
+        kfree(args_copy);
+
         userptr_t argv = sp;
         stackptr = (vaddr_t) sp;
-        
+
 	/* Warp to user mode. */
 	enter_new_process(argc /*argc*/, argv /*userspace addr of argv*/,
 			  NULL /*userspace addr of environment*/,
