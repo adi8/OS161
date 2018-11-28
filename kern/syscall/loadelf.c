@@ -202,6 +202,12 @@ load_elf(struct vnode *v, vaddr_t *entrypoint)
 		return ENOEXEC;
 	}
 
+        /* Setup page table in addresspace */
+        result = as_init_pagetable(as, eh.e_phnum);
+        if (result) {
+                return result;
+        }
+
 	/*
 	 * Go through the list of segments and set up the address space.
 	 *

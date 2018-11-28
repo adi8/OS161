@@ -122,7 +122,8 @@ vm_tlbshootdown(const struct tlbshootdown *ts)
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
-	vaddr_t vbase1, vtop1, vbase2, vtop2, stackbase, stacktop;
+	//vaddr_t vbase1, vtop1, vbase2, vtop2, stackbase, stacktop;
+	vaddr_t vbase, vtop, stackbase, stacktop;
 	paddr_t paddr;
 	int i;
 	uint32_t ehi, elo;
@@ -163,45 +164,50 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 		return EFAULT;
 	}
 
-	/* Assert that the address space has been set up properly. */
-	KASSERT(as->as_vbase1 != 0);
-	KASSERT(as->as_pbase1 != 0);
-	KASSERT(as->as_npages1 != 0);
-	KASSERT(as->as_vbase2 != 0);
-	KASSERT(as->as_pbase2 != 0);
-	KASSERT(as->as_npages2 != 0);
-	KASSERT(as->as_stackpbase != 0);
-	KASSERT((as->as_vbase1 & PAGE_FRAME) == as->as_vbase1);
-	KASSERT((as->as_pbase1 & PAGE_FRAME) == as->as_pbase1);
-	KASSERT((as->as_vbase2 & PAGE_FRAME) == as->as_vbase2);
-	KASSERT((as->as_pbase2 & PAGE_FRAME) == as->as_pbase2);
-	KASSERT((as->as_stackpbase & PAGE_FRAME) == as->as_stackpbase);
+        KASSERT(as->as_stackpbase != 0);
+        KASSERT((as->as_stackpbase & PAGE_FRAME) == as->as_stackpbase);
 
-	vbase1 = as->as_vbase1;
-	vtop1 = vbase1 + as->as_npages1 * PAGE_SIZE;
-	vbase2 = as->as_vbase2;
-	vtop2 = vbase2 + as->as_npages2 * PAGE_SIZE;
 	stackbase = USERSTACK - DUMBVM_STACKPAGES * PAGE_SIZE;
 	stacktop = USERSTACK;
+        
+        bool found = false;
+        int len = (int) as->nsegs;
+        for (int i = 0; i < len; i++) {
+	        /* 
+                 * Assert that the address space has been 
+                 * set up properly. 
+                 */
+                KASSERT(as->page_table[i].vaddr != 0);
+                KASSERT(as->page_table[i].paddr != 0);
+                KASSERT(as->page_table[i].chunksize != 0);
 
-	if (faultaddress >= vbase1 && faultaddress < vtop1) {
-		paddr = (faultaddress - vbase1) + as->as_pbase1;
-                if ((as->as_perm1 & (VM_R | VM_W)) == VM_R) {
-                        readonly = 1;
+                vbase = as->page_table[i].vaddr;
+                vtop  = vbase + as->page_table[i].chunksize * PAGE_SIZE;
+                if (faultaddress >= vbase && faultaddress < vtop) {
+                        paddr = (faultaddress - vbase) +
+                                as->page_table[i].paddr;
+                        uint32_t faultaddress_perm = 
+                                as->page_table[i].p_perm & (VM_R | VM_W);
+                        if (faultaddress_perm == VM_R) {
+                                readonly = 1;
+                        }
+                        found = true;
+                        break;
                 }
-	}
-	else if (faultaddress >= vbase2 && faultaddress < vtop2) {
-		paddr = (faultaddress - vbase2) + as->as_pbase2;
-                if ((as->as_perm2 & (VM_R | VM_W)) == VM_R) {
-                        readonly = 1;
-                }
-	}
-	else if (faultaddress >= stackbase && faultaddress < stacktop) {
-		paddr = (faultaddress - stackbase) + as->as_stackpbase;
-	}
-	else {
-		return EFAULT;
-	}
+                
+        }
+
+        if (!found && 
+            faultaddress >= stackbase && 
+            faultaddress < stacktop)
+        {
+                paddr = (faultaddress - stackbase) + as->as_stackpbase;
+                found = true;
+        }
+
+        if (!found) {
+                return EFAULT;
+        }
 
 	/* make sure it's page-aligned */
 	KASSERT((paddr & PAGE_FRAME) == paddr);

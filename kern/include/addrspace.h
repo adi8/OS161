@@ -41,6 +41,16 @@
 struct vnode;
 
 
+/* Page table entry */
+struct pagetable_entry {
+        vaddr_t vaddr;
+        paddr_t paddr;
+        uint32_t t_perm;
+        uint32_t p_perm;
+        uint32_t chunksize;
+};
+
+
 /*
  * Address space - data structure associated with the virtual memory
  * space of a process.
@@ -59,17 +69,10 @@ struct addrspace {
         paddr_t as_stackpbase;
 #else
         /* Put stuff here for your VM system */
-        vaddr_t as_vbase1;
-        paddr_t as_pbase1;
-        size_t as_npages1;
-        uint32_t as_perm1;
-        uint32_t as_tmp_perm1;
-        vaddr_t as_vbase2;
-        paddr_t as_pbase2;
-        size_t as_npages2;
-        uint32_t as_perm2;
-        uint32_t as_tmp_perm2;
         paddr_t as_stackpbase;
+        struct pagetable_entry *page_table;
+        size_t nsegs;
+        
 #endif
 };
 
@@ -128,6 +131,7 @@ int               as_define_region(struct addrspace *as,
 int               as_prepare_load(struct addrspace *as);
 int               as_complete_load(struct addrspace *as);
 int               as_define_stack(struct addrspace *as, vaddr_t *initstackptr);
+int               as_init_pagetable(struct addrspace *as, uint32_t nsegs);
 
 
 /*

@@ -49,6 +49,7 @@ as_create(void)
 		return NULL;
 	}
 
+        /*
 	as->as_vbase1 = 0;
 	as->as_pbase1 = 0;
 	as->as_npages1 = 0;
@@ -59,6 +60,7 @@ as_create(void)
 	as->as_npages2 = 0;
         as->as_perm2 = 0;
         as->as_tmp_perm2 = 0;
+        */
 	as->as_stackpbase = 0;
 
 	return as;
@@ -67,8 +69,12 @@ as_create(void)
 void
 as_destroy(struct addrspace *as)
 {
-        free_kpages(PADDR_TO_KVADDR(as->as_pbase1));
-        free_kpages(PADDR_TO_KVADDR(as->as_pbase2));
+        //free_kpages(PADDR_TO_KVADDR(as->as_pbase1));
+        //free_kpages(PADDR_TO_KVADDR(as->as_pbase2));
+        int len = (int) as->nsegs;
+        for (int i = 0; i < len; i++) {
+                free_kpages(PADDR_TO_KVADDR(as->page_table[i].paddr));
+        }
         free_kpages(PADDR_TO_KVADDR(as->as_stackpbase));
 	kfree(as);
 }
@@ -116,6 +122,7 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 	npages = sz / PAGE_SIZE;
 
 	/* We don't use these - all pages are read-write */
+        /*
 
 	if (as->as_vbase1 == 0) {
 		as->as_vbase1 = vaddr;
@@ -130,12 +137,19 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
                 as->as_tmp_perm2 = readable | writeable | executable;
 		return 0;
 	}
+        */
+        as->page_table[as->nsegs].vaddr = vaddr;
+        as->page_table[as->nsegs].t_perm = 
+                readable | writeable | executable;
+        as->page_table[as->nsegs].chunksize = npages;
+
+        as->nsegs++;
 
 	/*
 	 * Support for more than two regions is not available.
 	 */
-	kprintf("dumbvm: Warning: too many regions\n");
-	return ENOSYS;
+	//kprintf("dumbvm: Warning: too many regions\n");
+	return 0;
 }
 
 static
@@ -148,10 +162,12 @@ as_zero_region(paddr_t paddr, unsigned npages)
 int
 as_prepare_load(struct addrspace *as)
 {
+        /*
 	KASSERT(as->as_pbase1 == 0);
 	KASSERT(as->as_pbase2 == 0);
 	KASSERT(as->as_stackpbase == 0);
 
+        
 	as->as_pbase1 = getppages(as->as_npages1);
 	if (as->as_pbase1 == 0) {
 		return ENOMEM;
@@ -170,6 +186,25 @@ as_prepare_load(struct addrspace *as)
 	as_zero_region(as->as_pbase1, as->as_npages1);
 	as_zero_region(as->as_pbase2, as->as_npages2);
 	as_zero_region(as->as_stackpbase, DUMBVM_STACKPAGES);
+        */
+
+        int len = (int) as->nsegs;
+        for(int i = 0; i < len; i++) {
+                as->page_table[i].paddr = 
+                        getppages(as->page_table[i].chunksize);
+                if (as->page_table[i].paddr == 0) {
+                        return ENOMEM;
+                }
+                as_zero_region(as->page_table[i].paddr,
+                               as->page_table[i].chunksize);
+        }
+        
+
+	as->as_stackpbase = getppages(DUMBVM_STACKPAGES);
+	if (as->as_stackpbase == 0) {
+		return ENOMEM;
+	}
+	as_zero_region(as->as_stackpbase, DUMBVM_STACKPAGES);
 
 	return 0;
 }
@@ -177,8 +212,15 @@ as_prepare_load(struct addrspace *as)
 int
 as_complete_load(struct addrspace *as)
 {
+        /*
 	as->as_perm1 = as->as_tmp_perm1;
         as->as_perm2 = as->as_tmp_perm2;
+        */
+        /* Set the permissions of a segments pages */
+        int len = (int) as->nsegs;
+        for (int i = 0; i < len; i++) {
+                as->page_table[i].p_perm = as->page_table[i].t_perm;
+        }
 	return 0;
 }
 
@@ -201,33 +243,50 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 		return ENOMEM;
 	}
 
-	new->as_vbase1 = old->as_vbase1;
-	new->as_npages1 = old->as_npages1;
-	new->as_vbase2 = old->as_vbase2;
-	new->as_npages2 = old->as_npages2;
+        int result = as_init_pagetable(new, old->nsegs);
+        if (result) {
+                return result;
+        }
 
+        new->nsegs = old->nsegs;
+
+        int len = (int) new->nsegs;
+        for (int i = 0; i < len; i++) {
+                new->page_table[i].vaddr = old->page_table[i].vaddr;
+                new->page_table[i].chunksize = 
+                        old->page_table[i].chunksize;
+        }
+        
 	/* (Mis)use as_prepare_load to allocate some physical memory. */
 	if (as_prepare_load(new)) {
 		as_destroy(new);
 		return ENOMEM;
 	}
 
-	KASSERT(new->as_pbase1 != 0);
-	KASSERT(new->as_pbase2 != 0);
+        for (int i = 0; i < len; i++) {
+                KASSERT(new->page_table[i].paddr != 0);
+                memmove((void *)PADDR_TO_KVADDR(new->page_table[i].paddr),
+                        (const void *)PADDR_TO_KVADDR(old->page_table[i].paddr),
+                        old->page_table[i].chunksize * PAGE_SIZE);
+        }
+
 	KASSERT(new->as_stackpbase != 0);
-
-	memmove((void *)PADDR_TO_KVADDR(new->as_pbase1),
-		(const void *)PADDR_TO_KVADDR(old->as_pbase1),
-		old->as_npages1*PAGE_SIZE);
-
-	memmove((void *)PADDR_TO_KVADDR(new->as_pbase2),
-		(const void *)PADDR_TO_KVADDR(old->as_pbase2),
-		old->as_npages2*PAGE_SIZE);
-
 	memmove((void *)PADDR_TO_KVADDR(new->as_stackpbase),
 		(const void *)PADDR_TO_KVADDR(old->as_stackpbase),
 		DUMBVM_STACKPAGES*PAGE_SIZE);
 
 	*ret = new;
 	return 0;
+}
+
+int
+as_init_pagetable(struct addrspace *as, uint32_t nsegs) {
+        /* Set nsegs as 0 here so that it can be used as a counter */
+        as->nsegs = 0;
+        as->page_table = kmalloc(nsegs * sizeof(struct pagetable_entry));
+        if (as->page_table == NULL) {
+                return ENOMEM;
+        }
+
+        return 0;
 }
