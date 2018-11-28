@@ -38,6 +38,7 @@
 #include <addrspace.h>
 #include <vm.h>
 #include <coremap.h>
+#include <syscall.h>
 
 /*
  * Dumb MIPS-only "VM system" that is intended to only be just barely
@@ -75,17 +76,6 @@ vm_bootstrap(void)
 paddr_t
 getppages(unsigned long npages)
 {
-/*
-	paddr_t addr;
-
-	spinlock_acquire(&stealmem_lock);
-
-	addr = ram_stealmem(npages);
-
-	spinlock_release(&stealmem_lock);
-	return addr;
-*/
-        
         paddr_t addr;
 
         spinlock_acquire(&coremap_lock);
@@ -138,6 +128,7 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 	uint32_t ehi, elo;
 	struct addrspace *as;
 	int spl;
+        uint32_t readonly = 0;
 
 	faultaddress &= PAGE_FRAME;
 
@@ -145,8 +136,8 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 
 	switch (faulttype) {
 	    case VM_FAULT_READONLY:
-		/* We always create pages read-write, so we can't get this */
-		panic("dumbvm: got VM_FAULT_READONLY\n");
+                /* Return operation not permitted error */
+                return EPERM; 
 	    case VM_FAULT_READ:
 	    case VM_FAULT_WRITE:
 		break;
@@ -195,9 +186,15 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 
 	if (faultaddress >= vbase1 && faultaddress < vtop1) {
 		paddr = (faultaddress - vbase1) + as->as_pbase1;
+                if ((as->as_perm1 & (VM_R | VM_W)) == VM_R) {
+                        readonly = 1;
+                }
 	}
 	else if (faultaddress >= vbase2 && faultaddress < vtop2) {
 		paddr = (faultaddress - vbase2) + as->as_pbase2;
+                if ((as->as_perm2 & (VM_R | VM_W)) == VM_R) {
+                        readonly = 1;
+                }
 	}
 	else if (faultaddress >= stackbase && faultaddress < stacktop) {
 		paddr = (faultaddress - stackbase) + as->as_stackpbase;
@@ -218,7 +215,10 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 			continue;
 		}
 		ehi = faultaddress;
-		elo = paddr | TLBLO_DIRTY | TLBLO_VALID;
+		elo = paddr | TLBLO_VALID;
+                if (!readonly) {
+                        elo |= TLBLO_DIRTY;
+                }
 		DEBUG(DB_VM, "dumbvm: 0x%x -> 0x%x\n", faultaddress, paddr);
 		tlb_write(ehi, elo, i);
 		splx(spl);
@@ -227,7 +227,10 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 
         /* Overwrite a random entry if TLB is filled */
         ehi = faultaddress;
-        elo = paddr | TLBLO_DIRTY | TLBLO_VALID;
+        elo = paddr | TLBLO_VALID;
+        if (!readonly) {
+                elo |= TLBLO_DIRTY;
+        }
         tlb_random(ehi, elo);
 	splx(spl);
 

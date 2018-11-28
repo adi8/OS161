@@ -39,23 +39,6 @@
 #include <vm.h>
 #include <coremap.h>
 
-/* * Dumb MIPS-only "VM system" that is intended to only be just barely
- * enough to struggle off the ground. You should replace all of this
- * code while doing the VM assignment. In fact, starting in that
- * assignment, this file is not included in your kernel!
- *
- * NOTE: it's been found over the years that students often begin on
- * the VM assignment by copying dumbvm.c and trying to improve it.
- * This is not recommended. dumbvm is (more or less intentionally) not
- * a good design reference. The first recommendation would be: do not
- * look at dumbvm at all. The second recommendation would be: if you
- * do, be sure to review it from the perspective of comparing it to
- * what a VM system is supposed to do, and understanding what corners
- * it's cutting (there are many) and why, and more importantly, how.
- */
-
-/* under dumbvm, always have 72k of user stack */
-/* (this must be > 64K so argument blocks of size ARG_MAX will fit) */
 #define DUMBVM_STACKPAGES    18
 
 struct addrspace *
@@ -69,9 +52,13 @@ as_create(void)
 	as->as_vbase1 = 0;
 	as->as_pbase1 = 0;
 	as->as_npages1 = 0;
+        as->as_perm1 = 0;
+        as->as_tmp_perm1 = 0;
 	as->as_vbase2 = 0;
 	as->as_pbase2 = 0;
 	as->as_npages2 = 0;
+        as->as_perm2 = 0;
+        as->as_tmp_perm2 = 0;
 	as->as_stackpbase = 0;
 
 	return as;
@@ -129,19 +116,18 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t sz,
 	npages = sz / PAGE_SIZE;
 
 	/* We don't use these - all pages are read-write */
-	(void)readable;
-	(void)writeable;
-	(void)executable;
 
 	if (as->as_vbase1 == 0) {
 		as->as_vbase1 = vaddr;
 		as->as_npages1 = npages;
+                as->as_tmp_perm1 = readable | writeable | executable;
 		return 0;
 	}
 
 	if (as->as_vbase2 == 0) {
 		as->as_vbase2 = vaddr;
 		as->as_npages2 = npages;
+                as->as_tmp_perm2 = readable | writeable | executable;
 		return 0;
 	}
 
@@ -191,7 +177,8 @@ as_prepare_load(struct addrspace *as)
 int
 as_complete_load(struct addrspace *as)
 {
-	(void)as;
+	as->as_perm1 = as->as_tmp_perm1;
+        as->as_perm2 = as->as_tmp_perm2;
 	return 0;
 }
 

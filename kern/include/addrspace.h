@@ -62,9 +62,13 @@ struct addrspace {
         vaddr_t as_vbase1;
         paddr_t as_pbase1;
         size_t as_npages1;
+        uint32_t as_perm1;
+        uint32_t as_tmp_perm1;
         vaddr_t as_vbase2;
         paddr_t as_pbase2;
         size_t as_npages2;
+        uint32_t as_perm2;
+        uint32_t as_tmp_perm2;
         paddr_t as_stackpbase;
 #endif
 };

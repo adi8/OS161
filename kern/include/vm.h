@@ -44,6 +44,11 @@
 #define VM_FAULT_WRITE       1    /* A write was attempted */
 #define VM_FAULT_READONLY    2    /* A write to a readonly page was attempted*/
 
+/* Region permissions */
+#define VM_R 0x4
+#define VM_W 0x2
+#define VM_X 0x1
+
 /* Initialization function */
 void vm_bootstrap(void);
 
